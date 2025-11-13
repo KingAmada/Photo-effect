@@ -20,7 +20,7 @@
         }
         
         /* Styles for the new Canvas effect (from your code) */
-        #tilt-canvas {
+        #tilt-canvas, #ascii-canvas {
             width: 100%;
             min-width: 200px;
             max-width: 500px;
@@ -30,7 +30,7 @@
             display: block;
         }
         
-        .tilt-input {
+        .tilt-input, .ascii-input {
             width: 100%;
             padding: 0.5rem 0.75rem;
             border: 1px solid #D1D5DB; /* border-gray-300 */
@@ -55,7 +55,7 @@
             Printable Text Illusion Gallery
         </h1>
         <p class="text-center text-gray-600 mb-8">
-            Type in the box below to see your text rendered in 13 different illusion styles.
+            Type in the box below to see your text rendered in 14 different illusion styles.
         </p>
 
         <div class="mb-10 max-w-2xl mx-auto sticky top-4 z-10 bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg">
@@ -421,6 +421,29 @@
                 </div>
             </div>
 
+            <div class="border border-purple-200 rounded-lg p-4 shadow-sm bg-purple-50 lg:col-span-2">
+                <h2 class="text-xl font-semibold text-purple-800 mb-4">15. Image to ASCII using Specified Text (Advanced)</h2>
+                <p class="text-sm text-gray-600 -mt-3 mb-4">(Enter an image URL and text; converts the image to ASCII art using characters from the text, mapped by pixel brightness for a hidden image illusion)</p>
+                
+                <canvas id="ascii-canvas"></canvas>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                        <label for="asciiText" class="block text-sm font-medium text-gray-700 mb-1">Text for ASCII Chars</label>
+                        <input type="text" placeholder="e.g., SECURITY" id="asciiText" class="ascii-input" value="SECURITY" />
+                    </div>
+                    <div>
+                        <label for="asciiImageUrl" class="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                        <input type="url" placeholder="https://example.com/image.jpg" id="asciiImageUrl" class="ascii-input" value="https://via.placeholder.com/400x300/4ECDC4/FFFFFF?text=Image" />
+                        <img id="asciiPreview" class="image-preview" style="display: none;" alt="Preview" />
+                    </div>
+                </div>
+                <div class="text-center mt-6">
+                    <button type="button" onclick="loadAndUpdateAsciiCanvas()" class="download-btn mr-2">Load & Update</button>
+                    <button type="button" onclick="downloadAsciiCanvas(this, 'ascii-canvas')" class="download-btn">Download .PNG</button>
+                </div>
+            </div>
+
         </div> </div>
 
     <template id="loading-button-template">
@@ -508,11 +531,12 @@
         // --- Call update on page load ---
         window.onload = () => {
             updateAllText();
-            initializeTiltCanvas(); // Initialize the new canvas effect
+            initializeTiltCanvas(); // Initialize the tilt canvas
+            initializeAsciiCanvas(); // Initialize the new ASCII canvas
         };
         
         
-        // --- UPDATED SCRIPT for Tilt-to-Read Text with Small Tiled Image Background ---
+        // --- SCRIPT for Tilt-to-Read Text with Small Tiled Image Background (unchanged) ---
         
         let tiltCanvas, tiltCtx, tiltScale, tiltText, colorImage;
         let colorImageLoaded = false;
@@ -664,8 +688,150 @@
             button.disabled = false;
         }
 
+        // --- NEW SCRIPT for Image to ASCII using Specified Text ---
+        
+        let asciiCanvas, asciiCtx, asciiImage;
+        let asciiImageLoaded = false;
+
+        function initializeAsciiCanvas() {
+            asciiCanvas = document.getElementById('ascii-canvas');
+            if (!asciiCanvas) return;
+            
+            asciiCtx = asciiCanvas.getContext('2d');
+
+            asciiCanvas.width = 500;
+            asciiCanvas.height = 400;
+
+            asciiImage = new Image();
+            
+            document.getElementById('asciiText').oninput = function() {
+                updateAsciiCanvas();
+            };
+            
+            document.getElementById('asciiImageUrl').oninput = function() {
+                const url = this.value;
+                const preview = document.getElementById('asciiPreview');
+                if (url) {
+                    preview.src = url;
+                    preview.style.display = 'block';
+                    asciiImage.onload = () => {
+                        asciiImageLoaded = true;
+                        updateAsciiCanvas();
+                    };
+                    asciiImage.onerror = () => {
+                        console.error('Failed to load ASCII image');
+                        asciiImageLoaded = false;
+                        updateAsciiCanvas();
+                    };
+                    asciiImage.src = url;
+                } else {
+                    preview.style.display = 'none';
+                    asciiImageLoaded = false;
+                    updateAsciiCanvas();
+                }
+            };
+            
+            updateAsciiCanvas();
+        }
+
+        function loadAndUpdateAsciiCanvas() {
+            // Trigger input events to reload
+            document.getElementById('asciiImageUrl').dispatchEvent(new Event('input'));
+            updateAsciiCanvas();
+        }
+
+        function updateAsciiCanvas() {
+            if (!asciiCtx || !asciiImageLoaded) return;
+            
+            asciiCtx.fillStyle = "#fff";
+            asciiCtx.fillRect(0, 0, asciiCanvas.width, asciiCanvas.height);
+
+            const text = document.getElementById('asciiText').value.toUpperCase() || ' ';
+            const chars = text.split('').filter((c, i, arr) => arr.indexOf(c) === i); // Unique chars from text
+            if (chars.length === 0) return;
+
+            // Sort chars by approximate width for better mapping (darker/wider chars for darker pixels)
+            const sortedChars = chars.sort((a, b) => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 100;
+                tempCanvas.height = 100;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.font = '20px monospace';
+                return tempCtx.measureText(b).width - tempCtx.measureText(a).width;
+            });
+
+            // Draw image to temp canvas to sample pixels
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = asciiCanvas.width * 4; // Higher res for better sampling
+            tempCanvas.height = asciiCanvas.height * 4;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(asciiImage, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+
+            asciiCtx.font = '8px monospace'; // Small font for dense ASCII
+            asciiCtx.fillStyle = '#000';
+            asciiCtx.textAlign = 'center';
+            asciiCtx.textBaseline = 'middle';
+
+            const charWidth = 8; // Approx char width in px
+            const charHeight = 12; // Approx char height
+
+            for (let y = 0; y < asciiCanvas.height; y += charHeight) {
+                for (let x = 0; x < asciiCanvas.width; x += charWidth) {
+                    // Sample average brightness from 4x4 block
+                    let totalBrightness = 0;
+                    let samples = 0;
+                    for (let dy = 0; dy < 4 && y * 4 + dy < tempCanvas.height; dy++) {
+                        for (let dx = 0; dx < 4 && x * 4 + dx < tempCanvas.width; dx++) {
+                            const i = ((y * 4 + dy) * tempCanvas.width + (x * 4 + dx)) * 4;
+                            const r = imageData[i], g = imageData[i + 1], b = imageData[i + 2];
+                            totalBrightness += (r + g + b) / 3;
+                            samples++;
+                        }
+                    }
+                    const avgBrightness = totalBrightness / samples;
+                    const index = Math.floor((1 - avgBrightness / 255) * (sortedChars.length - 1)); // Darker -> earlier (wider) char
+                    const char = sortedChars[index] || ' ';
+
+                    asciiCtx.fillText(char, x + charWidth / 2, y + charHeight / 2);
+                }
+            }
+        }
+        
+        function downloadAsciiCanvas(button, canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const originalButtonHTML = button.innerHTML;
+            const loadingTemplate = document.getElementById('loading-button-template');
+            button.innerHTML = loadingTemplate.innerHTML;
+            button.disabled = true;
+
+            try {
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                
+                const text = document.getElementById('asciiText').value || 'ascii';
+                const imgUrl = document.getElementById('asciiImageUrl').value || 'image';
+                const imgName = imgUrl.split('/').pop().split('?')[0] || 'image';
+                const filename = `ascii-illusion-${text.toLowerCase().replace(/\s+/g, '-')}-${imgName}.png`;
+                link.download = filename;
+
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error("Error downloading canvas:", err);
+                alert('Download failed—check console for details. Try refreshing the page.');
+            }
+            
+            button.innerHTML = originalButtonHTML;
+            button.disabled = false;
+        }
+
         // --- Refactored, reusable download function for SVGs ---
-        // *** This is the reverted, simpler, and correct version ***
         function downloadPNG(button, svgId, filenameBase) {
             const svg = document.getElementById(svgId);
             if (!svg) return;
