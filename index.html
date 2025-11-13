@@ -395,8 +395,8 @@
             </div>
             
             <div class="border border-green-200 rounded-lg p-4 shadow-sm bg-green-50">
-                <h2 class="text-xl font-semibold text-green-800 mb-4">14. Tilt-to-Read Text with Image Coloring</h2>
-                <p class="text-sm text-gray-600 -mt-3 mb-4">(This effect has its own inputs; text lines are filled with repeating colors from the provided image for a textured, colorful tilt illusion)</p>
+                <h2 class="text-xl font-semibold text-green-800 mb-4">14. Tilt-to-Read Text with Small Image Background</h2>
+                <p class="text-sm text-gray-600 -mt-3 mb-4">(This effect has its own inputs; text lines are filled with a finely tiled, small version of the provided image as background texture for the tilt illusion)</p>
                 
                 <canvas id="tilt-canvas"></canvas>
                 
@@ -410,7 +410,7 @@
                         <input type="text" placeholder="Type vertical text..." id="vText" class="tilt-input" value="MICRO PRESS LTD" />
                     </div>
                     <div>
-                        <label for="colorImageUrl" class="block text-sm font-medium text-gray-700 mb-1">Color Image URL</label>
+                        <label for="colorImageUrl" class="block text-sm font-medium text-gray-700 mb-1">Small Image URL (for texture)</label>
                         <input type="url" placeholder="https://example.com/image.jpg" id="colorImageUrl" class="tilt-input" value="https://via.placeholder.com/400x300/FF6B6B/4ECDC4?text=Color+Image" />
                         <img id="colorPreview" class="image-preview" style="display: none;" alt="Preview" />
                     </div>
@@ -512,10 +512,11 @@
         };
         
         
-        // --- REVERTED & MODIFIED SCRIPT for Tilt-to-Read Text with Image Coloring ---
+        // --- UPDATED SCRIPT for Tilt-to-Read Text with Small Tiled Image Background ---
         
         let tiltCanvas, tiltCtx, tiltScale, tiltText, colorImage;
         let colorImageLoaded = false;
+        const TILE_SIZE = 10; // Size of small tiled image (px) - adjust for finer/coarser texture
 
         function initializeTiltCanvas() {
             tiltCanvas = document.getElementById('tilt-canvas');
@@ -589,21 +590,38 @@
             tiltCtx.fillStyle = "#fff";
             tiltCtx.fillRect(0, 0, tiltCanvas.width, tiltCanvas.height);
 
-            // Create pattern from color image if loaded
+            // Create small tiled pattern from color image if loaded
             let pattern;
             if (colorImageLoaded) {
-                pattern = tiltCtx.createPattern(colorImage, 'repeat');
+                // Create a small temporary canvas for the tile
+                const tileCanvas = document.createElement('canvas');
+                tileCanvas.width = TILE_SIZE;
+                tileCanvas.height = TILE_SIZE;
+                const tileCtx = tileCanvas.getContext('2d');
+                
+                // Scale and draw the image to the small tile (preserving aspect ratio)
+                const scale = Math.min(TILE_SIZE / colorImage.width, TILE_SIZE / colorImage.height);
+                const drawW = colorImage.width * scale;
+                const drawH = colorImage.height * scale;
+                const offsetX = (TILE_SIZE - drawW) / 2;
+                const offsetY = (TILE_SIZE - drawH) / 2;
+                tileCtx.fillStyle = "#fff"; // White background for tile if image doesn't fill
+                tileCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+                tileCtx.drawImage(colorImage, offsetX, offsetY, drawW, drawH);
+                
+                // Use the small tile as repeating pattern
+                pattern = tiltCtx.createPattern(tileCanvas, 'repeat');
             }
 
             tiltCtx.fillStyle = pattern || "#000"; // Fallback to black
 
-            // Draw horizontal text (becomes thin horizontal lines)
+            // Draw horizontal text (becomes thin horizontal lines with small image texture)
             tiltCtx.save();
             tiltCtx.scale(1, tiltScale.h);
             tiltCtx.fillText(tiltText.h, tiltCanvas.width / 2, tiltCanvas.height / tiltScale.h / 2);
             tiltCtx.restore();
 
-            // Draw vertical text (becomes thin vertical lines)
+            // Draw vertical text (becomes thin vertical lines with small image texture)
             tiltCtx.save();
             tiltCtx.translate(tiltCanvas.width / 2, tiltCanvas.height / 2);
             tiltCtx.rotate(Math.PI / 2);
@@ -629,7 +647,7 @@
                 
                 const h = document.getElementById('hText').value || 'tilt-h';
                 const v = document.getElementById('vText').value || 'tilt-v';
-                const imgUrl = document.getElementById('colorImageUrl').value || 'colored';
+                const imgUrl = document.getElementById('colorImageUrl').value || 'textured';
                 const imgName = imgUrl.split('/').pop().split('?')[0] || 'image';
                 const filename = `tilt-read-text-${h.toLowerCase().replace(/\s+/g, '-')}-${v.toLowerCase().replace(/\s+/g, '-')}-${imgName}.png`;
                 link.download = filename;
@@ -639,6 +657,7 @@
                 document.body.removeChild(link);
             } catch (err) {
                 console.error("Error downloading canvas:", err);
+                alert('Download failed—check console for details. Try refreshing the page.');
             }
             
             button.innerHTML = originalButtonHTML;
@@ -710,4 +729,4 @@
     </script>
 
 </body>
-</html>
+    </html>
