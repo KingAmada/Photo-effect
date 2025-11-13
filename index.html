@@ -395,8 +395,8 @@
             </div>
             
             <div class="border border-green-200 rounded-lg p-4 shadow-sm bg-green-50">
-                <h2 class="text-xl font-semibold text-green-800 mb-4">14. Tilt-to-View Photo</h2>
-                <p class="text-sm text-gray-600 -mt-3 mb-4">(Enter URLs for two photos; normal view shows the first, tilted 90° shows the second)</p>
+                <h2 class="text-xl font-semibold text-green-800 mb-4">14. Tilt-to-View Photo (Line Interlace)</h2>
+                <p class="text-sm text-gray-600 -mt-3 mb-4">(Enter URLs for two photos; creates interlaced vertical/horizontal line pattern forming small boxes. Straight on shows striped first photo; tilt paper 90° to reveal second photo from the pattern. Note: second photo may appear rotated.)</p>
                 
                 <canvas id="tilt-canvas"></canvas>
                 
@@ -509,9 +509,9 @@
         };
         
         
-        // --- MODIFIED SCRIPT for Tilt-to-View Photo Canvas ---
+        // --- UPDATED SCRIPT for Tilt-to-View Photo Canvas with Line Interlace ---
         
-        let tiltCanvas, tiltCtx, tiltScale, hImage, vImage;
+        let tiltCanvas, tiltCtx, hImage, vImage;
         let hImageLoaded = false, vImageLoaded = false;
 
         function initializeTiltCanvas() {
@@ -523,12 +523,6 @@
             tiltCanvas.width = 500;
             tiltCanvas.height = 500;
 
-            tiltScale = {
-              h: tiltCanvas.height / 20,  // ~25, for vertical stretch
-              v: tiltCanvas.width / 20    // ~25, for horizontal stretch after rotation
-            };
-            
-            // Preload placeholder images
             hImage = new Image();
             vImage = new Image();
             
@@ -548,25 +542,34 @@
             if (hUrl) {
                 hPreview.src = hUrl;
                 hPreview.style.display = 'block';
-                loadImage(hImage, hUrl, () => { hImageLoaded = true; updateTiltCanvas(); });
+                loadImage(hImage, hUrl, 'h', () => { hImageLoaded = true; updateTiltCanvas(); });
             } else {
                 hPreview.style.display = 'none';
                 hImageLoaded = false;
+                updateTiltCanvas();
             }
             
             if (vUrl) {
                 vPreview.src = vUrl;
                 vPreview.style.display = 'block';
-                loadImage(vImage, vUrl, () => { vImageLoaded = true; updateTiltCanvas(); });
+                loadImage(vImage, vUrl, 'v', () => { vImageLoaded = true; updateTiltCanvas(); });
             } else {
                 vPreview.style.display = 'none';
                 vImageLoaded = false;
+                updateTiltCanvas();
             }
         }
 
-        function loadImage(img, url, onloadCallback) {
-            img.onload = onloadCallback;
-            img.onerror = () => { console.error('Failed to load image:', url); };
+        function loadImage(img, url, type, onloadCallback) {
+            img.onload = () => {
+                onloadCallback();
+            };
+            img.onerror = () => { 
+                console.error('Failed to load image:', url); 
+                if (type === 'h') hImageLoaded = false;
+                else vImageLoaded = false;
+                updateTiltCanvas();
+            };
             img.src = url;
         }
 
@@ -575,42 +578,37 @@
         }
 
         function updateTiltCanvas() {
-            if (!tiltCtx || (!hImageLoaded && !vImageLoaded)) return;
+            if (!tiltCtx) return;
             
             tiltCtx.fillStyle = "#fff";
             tiltCtx.fillRect(0, 0, tiltCanvas.width, tiltCanvas.height);
 
-            const centerX = tiltCanvas.width / 2;
-            const centerY = tiltCanvas.height / 2;
+            if (!hImageLoaded && !vImageLoaded) return;
 
-            // Draw normal view photo (horizontal): stretch vertically to create thin vertical lines
+            const stripWidth = 1; // Thin strips for fine grid/boxes
+            const step = 2 * stripWidth; // Interlace: strip + gap
+
+            // Draw vertical strips from hImage (forms vertical lines/columns, visible straight-on)
             if (hImageLoaded) {
-                tiltCtx.save();
-                tiltCtx.translate(centerX, centerY);
-                tiltCtx.scale(1, tiltScale.h);  // Stretch y by ~25x
-                tiltCtx.translate(-centerX, -centerY);
-                // Draw image scaled to fit canvas before stretch
-                const imgScale = Math.min(tiltCanvas.width / hImage.width, (tiltCanvas.height / tiltScale.h) / hImage.height);
-                const drawW = hImage.width * imgScale;
-                const drawH = hImage.height * imgScale;
-                tiltCtx.drawImage(hImage, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
-                tiltCtx.restore();
+                const hScaleX = hImage.width / tiltCanvas.width;
+                for (let x = 0; x < tiltCanvas.width; x += step) {
+                    const sourceX = (x / tiltCanvas.width) * hImage.width;
+                    const sourceW = (stripWidth / tiltCanvas.width) * hImage.width;
+                    tiltCtx.drawImage(hImage, sourceX, 0, sourceW, hImage.height, x, 0, stripWidth, tiltCanvas.height);
+                }
             }
 
-            // Draw tilted view photo (vertical): rotate 90°, then stretch horizontally (scale x after rotation)
+            // Draw horizontal strips from vImage (forms horizontal lines, visible as vertical when tilted 90°)
             if (vImageLoaded) {
-                tiltCtx.save();
-                tiltCtx.translate(centerX, centerY);
-                tiltCtx.rotate(Math.PI / 2);
-                tiltCtx.scale(tiltScale.v, 1);  // After rotation, scale x by ~25x (stretches original y into thin horizontal lines when rotated back)
-                tiltCtx.translate(-centerX, -centerY);
-                // Draw image scaled to fit rotated canvas
-                const imgScale = Math.min((tiltCanvas.height / tiltScale.v) / vImage.width, tiltCanvas.width / vImage.height);
-                const drawW = vImage.width * imgScale;
-                const drawH = vImage.height * imgScale;
-                tiltCtx.drawImage(vImage, centerY - drawH / 2, -centerX - drawW / 2 + centerY, drawH, drawW);  // Adjusted for rotation
-                tiltCtx.restore();
+                const vScaleY = vImage.height / tiltCanvas.height;
+                for (let y = stripWidth; y < tiltCanvas.height; y += step) { // Offset to interlace with vertical
+                    const sourceY = (y / tiltCanvas.height) * vImage.height;
+                    const sourceH = (stripWidth / tiltCanvas.height) * vImage.height;
+                    tiltCtx.drawImage(vImage, 0, sourceY, vImage.width, sourceH, 0, y, tiltCanvas.width, stripWidth);
+                }
             }
+
+            // The crossing strips create a fine grid of small boxes/checker-like pattern
         }
         
         function downloadTiltCanvas(button, canvasId) {
@@ -629,7 +627,9 @@
                 
                 const hUrl = document.getElementById('hImageUrl').value || 'normal';
                 const vUrl = document.getElementById('vImageUrl').value || 'tilted';
-                const filename = `tilt-view-photo-${hUrl.split('/').pop().split('?')[0] || 'photo1'}-${vUrl.split('/').pop().split('?')[0] || 'photo2'}.png`;
+                const hName = hUrl.split('/').pop().split('?')[0] || 'photo1';
+                const vName = vUrl.split('/').pop().split('?')[0] || 'photo2';
+                const filename = `tilt-view-interlace-${hName}-${vName}.png`;
                 link.download = filename;
 
                 document.body.appendChild(link);
@@ -708,4 +708,4 @@
     </script>
 
 </body>
-</html>
+    </html>
