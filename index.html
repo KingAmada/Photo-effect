@@ -395,21 +395,24 @@
             </div>
             
             <div class="border border-green-200 rounded-lg p-4 shadow-sm bg-green-50">
-                <h2 class="text-xl font-semibold text-green-800 mb-4">14. Tilt-to-View Photo (Line Interlace)</h2>
-                <p class="text-sm text-gray-600 -mt-3 mb-4">(Enter URLs for two photos; creates interlaced vertical/horizontal line pattern forming small boxes. Straight on shows striped first photo; tilt paper 90° to reveal second photo from the pattern. Note: second photo may appear rotated.)</p>
+                <h2 class="text-xl font-semibold text-green-800 mb-4">14. Tilt-to-Read Text with Image Coloring</h2>
+                <p class="text-sm text-gray-600 -mt-3 mb-4">(This effect has its own inputs; text lines are filled with repeating colors from the provided image for a textured, colorful tilt illusion)</p>
                 
                 <canvas id="tilt-canvas"></canvas>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                     <div>
-                        <label for="hImageUrl" class="block text-sm font-medium text-gray-700 mb-1">Normal View Photo URL</label>
-                        <input type="url" placeholder="https://example.com/photo1.jpg" id="hImageUrl" class="tilt-input" value="https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=Photo+1" />
-                        <img id="hPreview" class="image-preview" style="display: none;" alt="Preview" />
+                        <label for="hText" class="block text-sm font-medium text-gray-700 mb-1">Horizontal Text</label>
+                        <input type="text" placeholder="Type horizontal text..." id="hText" class="tilt-input" value="PRINTED BY" />
                     </div>
                     <div>
-                        <label for="vImageUrl" class="block text-sm font-medium text-gray-700 mb-1">Tilted View Photo URL</label>
-                        <input type="url" placeholder="https://example.com/photo2.jpg" id="vImageUrl" class="tilt-input" value="https://via.placeholder.com/400x300/4ECDC4/FFFFFF?text=Photo+2" />
-                        <img id="vPreview" class="image-preview" style="display: none;" alt="Preview" />
+                        <label for="vText" class="block text-sm font-medium text-gray-700 mb-1">Vertical Text</label>
+                        <input type="text" placeholder="Type vertical text..." id="vText" class="tilt-input" value="MICRO PRESS LTD" />
+                    </div>
+                    <div>
+                        <label for="colorImageUrl" class="block text-sm font-medium text-gray-700 mb-1">Color Image URL</label>
+                        <input type="url" placeholder="https://example.com/image.jpg" id="colorImageUrl" class="tilt-input" value="https://via.placeholder.com/400x300/FF6B6B/4ECDC4?text=Color+Image" />
+                        <img id="colorPreview" class="image-preview" style="display: none;" alt="Preview" />
                     </div>
                 </div>
                 <div class="text-center mt-6">
@@ -509,10 +512,10 @@
         };
         
         
-        // --- UPDATED SCRIPT for Tilt-to-View Photo Canvas with Line Interlace ---
+        // --- REVERTED & MODIFIED SCRIPT for Tilt-to-Read Text with Image Coloring ---
         
-        let tiltCanvas, tiltCtx, hImage, vImage;
-        let hImageLoaded = false, vImageLoaded = false;
+        let tiltCanvas, tiltCtx, tiltScale, tiltText, colorImage;
+        let colorImageLoaded = false;
 
         function initializeTiltCanvas() {
             tiltCanvas = document.getElementById('tilt-canvas');
@@ -522,59 +525,62 @@
 
             tiltCanvas.width = 500;
             tiltCanvas.height = 500;
+            tiltCtx.font = '25px Arial';
+            tiltCtx.textAlign = 'center';
+            tiltCtx.textBaseline = 'middle';
 
-            hImage = new Image();
-            vImage = new Image();
-            
-            document.getElementById('hImageUrl').oninput = updateImagePreviews;
-            document.getElementById('vImageUrl').oninput = updateImagePreviews;
-            
-            updateImagePreviews(); // Initial load
-        }
-
-        function updateImagePreviews() {
-            const hUrl = document.getElementById('hImageUrl').value;
-            const vUrl = document.getElementById('vImageUrl').value;
-            
-            const hPreview = document.getElementById('hPreview');
-            const vPreview = document.getElementById('vPreview');
-            
-            if (hUrl) {
-                hPreview.src = hUrl;
-                hPreview.style.display = 'block';
-                loadImage(hImage, hUrl, 'h', () => { hImageLoaded = true; updateTiltCanvas(); });
-            } else {
-                hPreview.style.display = 'none';
-                hImageLoaded = false;
-                updateTiltCanvas();
-            }
-            
-            if (vUrl) {
-                vPreview.src = vUrl;
-                vPreview.style.display = 'block';
-                loadImage(vImage, vUrl, 'v', () => { vImageLoaded = true; updateTiltCanvas(); });
-            } else {
-                vPreview.style.display = 'none';
-                vImageLoaded = false;
-                updateTiltCanvas();
-            }
-        }
-
-        function loadImage(img, url, type, onloadCallback) {
-            img.onload = () => {
-                onloadCallback();
+            tiltScale = {
+              h: tiltCanvas.height / 20,
+              v: tiltCanvas.width / 20
             };
-            img.onerror = () => { 
-                console.error('Failed to load image:', url); 
-                if (type === 'h') hImageLoaded = false;
-                else vImageLoaded = false;
-                updateTiltCanvas();
+            
+            tiltText = {
+              h: document.getElementById('hText').value.toUpperCase(),
+              v: document.getElementById('vText').value.toUpperCase()
             };
-            img.src = url;
+            
+            colorImage = new Image();
+            
+            document.getElementById('hText').oninput = function() {
+              tiltText.h = this.value.toUpperCase();
+              updateTiltCanvas();
+            };
+            
+            document.getElementById('vText').oninput = function() {
+              tiltText.v = this.value.toUpperCase();
+              updateTiltCanvas();
+            };
+            
+            document.getElementById('colorImageUrl').oninput = function() {
+                const url = this.value;
+                const preview = document.getElementById('colorPreview');
+                if (url) {
+                    preview.src = url;
+                    preview.style.display = 'block';
+                    colorImage.onload = () => {
+                        colorImageLoaded = true;
+                        updateTiltCanvas();
+                    };
+                    colorImage.onerror = () => {
+                        console.error('Failed to load color image');
+                        colorImageLoaded = false;
+                        updateTiltCanvas();
+                    };
+                    colorImage.src = url;
+                } else {
+                    preview.style.display = 'none';
+                    colorImageLoaded = false;
+                    updateTiltCanvas();
+                }
+            };
+            
+            updateTiltCanvas();
         }
 
         function loadAndUpdateTiltCanvas() {
-            updateImagePreviews();
+            // Trigger input events to reload
+            document.getElementById('colorImageUrl').dispatchEvent(new Event('input'));
+            updateTiltCanvas();
         }
 
         function updateTiltCanvas() {
@@ -583,32 +589,28 @@
             tiltCtx.fillStyle = "#fff";
             tiltCtx.fillRect(0, 0, tiltCanvas.width, tiltCanvas.height);
 
-            if (!hImageLoaded && !vImageLoaded) return;
-
-            const stripWidth = 1; // Thin strips for fine grid/boxes
-            const step = 2 * stripWidth; // Interlace: strip + gap
-
-            // Draw vertical strips from hImage (forms vertical lines/columns, visible straight-on)
-            if (hImageLoaded) {
-                const hScaleX = hImage.width / tiltCanvas.width;
-                for (let x = 0; x < tiltCanvas.width; x += step) {
-                    const sourceX = (x / tiltCanvas.width) * hImage.width;
-                    const sourceW = (stripWidth / tiltCanvas.width) * hImage.width;
-                    tiltCtx.drawImage(hImage, sourceX, 0, sourceW, hImage.height, x, 0, stripWidth, tiltCanvas.height);
-                }
+            // Create pattern from color image if loaded
+            let pattern;
+            if (colorImageLoaded) {
+                pattern = tiltCtx.createPattern(colorImage, 'repeat');
             }
 
-            // Draw horizontal strips from vImage (forms horizontal lines, visible as vertical when tilted 90°)
-            if (vImageLoaded) {
-                const vScaleY = vImage.height / tiltCanvas.height;
-                for (let y = stripWidth; y < tiltCanvas.height; y += step) { // Offset to interlace with vertical
-                    const sourceY = (y / tiltCanvas.height) * vImage.height;
-                    const sourceH = (stripWidth / tiltCanvas.height) * vImage.height;
-                    tiltCtx.drawImage(vImage, 0, sourceY, vImage.width, sourceH, 0, y, tiltCanvas.width, stripWidth);
-                }
-            }
+            tiltCtx.fillStyle = pattern || "#000"; // Fallback to black
 
-            // The crossing strips create a fine grid of small boxes/checker-like pattern
+            // Draw horizontal text (becomes thin horizontal lines)
+            tiltCtx.save();
+            tiltCtx.scale(1, tiltScale.h);
+            tiltCtx.fillText(tiltText.h, tiltCanvas.width / 2, tiltCanvas.height / tiltScale.h / 2);
+            tiltCtx.restore();
+
+            // Draw vertical text (becomes thin vertical lines)
+            tiltCtx.save();
+            tiltCtx.translate(tiltCanvas.width / 2, tiltCanvas.height / 2);
+            tiltCtx.rotate(Math.PI / 2);
+            tiltCtx.translate(-tiltCanvas.width / 2, -tiltCanvas.width / 2); 
+            tiltCtx.scale(1, tiltScale.v);
+            tiltCtx.fillText(tiltText.v, tiltCanvas.width / 2, tiltCanvas.height / tiltScale.v / 2);
+            tiltCtx.restore();
         }
         
         function downloadTiltCanvas(button, canvasId) {
@@ -625,11 +627,11 @@
                 const link = document.createElement('a');
                 link.href = dataUrl;
                 
-                const hUrl = document.getElementById('hImageUrl').value || 'normal';
-                const vUrl = document.getElementById('vImageUrl').value || 'tilted';
-                const hName = hUrl.split('/').pop().split('?')[0] || 'photo1';
-                const vName = vUrl.split('/').pop().split('?')[0] || 'photo2';
-                const filename = `tilt-view-interlace-${hName}-${vName}.png`;
+                const h = document.getElementById('hText').value || 'tilt-h';
+                const v = document.getElementById('vText').value || 'tilt-v';
+                const imgUrl = document.getElementById('colorImageUrl').value || 'colored';
+                const imgName = imgUrl.split('/').pop().split('?')[0] || 'image';
+                const filename = `tilt-read-text-${h.toLowerCase().replace(/\s+/g, '-')}-${v.toLowerCase().replace(/\s+/g, '-')}-${imgName}.png`;
                 link.download = filename;
 
                 document.body.appendChild(link);
@@ -708,4 +710,4 @@
     </script>
 
 </body>
-    </html>
+</html>
